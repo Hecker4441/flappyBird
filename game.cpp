@@ -1,107 +1,43 @@
 #include "game.hpp"
+#include "MainMenu.hpp"
+#include <iostream>
 
-
-Game::Game() : window(sf::VideoMode({800, 600}), "Snake"),
-               m_snake(m_world.GetBlockSize()), m_world(sf::Vector2u(800, 600))
+Game::Game(sf::Vector2u size)
 {
-     window.setFramerateLimit(30);
+    // std::cout << "GAME CONSTRUCTOR1" << std::endl;
+    data->window.create(sf::VideoMode(size), "flappy bird");
+    // std::cout << "GAME CONSTRUCTOR2" << std::endl;
 
+    // std::cout << "GAME CONSTRUCTOR3" << std::endl;
+
+    // run();
 }
-Game::~Game()
+
+void Game::run()
 {
-}
+    sf::Clock clock;
+    data->states.pushState(state(new MainMenu(data)));
 
-float Game::GetElapsed() { return m_elapsed; }
-
-void Game::RestartClock() { m_elapsed = m_clock.restart().asSeconds(); }
-
-void Game::Update()
-{
-    float timestep = 1.0f / m_snake.GetSpeed();
-    if (m_elapsed >= timestep)
+    float currentTime = clock.restart().asSeconds();
+    while (data->window.isOpen())
     {
-        m_snake.Tick();
-        m_world.Update(m_snake);
-        m_elapsed -= timestep;
-        if (m_snake.HasLost())
+
+        while (auto event = data->window.pollEvent())
         {
-            m_snake.Reset();
+            if (event.is<sf::Event::Closed>())
+                data->window.close();
+            // std::cout << "game loop 1" << std::endl;
+            data->states.getActiveState()->handleInput(event);
         }
+
+        float newTime = clock.getElapsedTime().asSeconds();
+        float deltaTime = newTime - currentTime;
+        currentTime = newTime;
+
+        data->states.getActiveState()->update(deltaTime);
+
+        data->states.getActiveState()->draw();
+
+        // std::cout << "GAME Loop end" << std::endl;
     }
-}
-void Game::HandleInput()
-{
-
-    
-    while (const auto event = window.pollEvent())
-    {
-        if (event.is<sf::Event::Closed>() || (event.is<sf::Event::KeyPressed>() && event.getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape))
-            {
-                window.close();
-                break;
-            }
-        if (event.is<sf::Event::KeyPressed>())
-            {
-
-                switch (event.getIf<sf::Event::KeyPressed>()->code)
-                {
-                    case sf::Keyboard::Key::Up:
-                        m_snake.SetDirection(Direction::Up);
-                        break;
-                    case sf::Keyboard::Key::Down:
-                        m_snake.SetDirection(Direction::Down);
-                        break;
-
-                    case sf::Keyboard::Key::Left:
-                         m_snake.SetDirection(Direction::Left);
-                         break;
-
-
-                    case sf::Keyboard::Key::Right:
-                         m_snake.SetDirection(Direction::Right);
-                         break;
-
-                default:
-                    break;
-                }
-            }
-        // if (event.type == sf::Event::Closed)
-        // {
-        //     window.close();
-        // }
-        // if (event.type == sf::Keyboard::isKeyPressed(sf::Keyboard::Up) && m_snake.GetDirection() != Direction::Down)
-        // {
-            
-        // }
-        // else if (event.type == sf::Keyboard::isKeyPressed(sf::Keyboard::Down) && m_snake.GetDirection() != Direction::Up)
-        // {
-        //     m_snake.SetDirection(Direction::Down);
-        // }
-        // else if (event.type == sf::Keyboard::isKeyPressed(sf::Keyboard::Left) && m_snake.GetDirection() != Direction::Right)
-        // {
-        //     m_snake.SetDirection(Direction::Left);
-        // }
-        // else if (event.type == sf::Keyboard::isKeyPressed(sf::Keyboard::Right) && m_snake.GetDirection() != Direction::Left)
-        // {
-        //     m_snake.SetDirection(Direction::Right);
-        // }
-    }
-}
-
-bool Game::isgame()
-{
-    return window.isOpen();
-}
-
-void Game::Render()
-{
-
-    window.clear();
-    // Render here.
-    
-    m_snake.Tick();
-    m_snake.Render(window);
-    m_world.Update(m_snake);
-    m_world.Render(window);
-    window.display();
 }

@@ -1,79 +1,147 @@
-#include "world.hpp"
-#include<iostream>
+#include "World.hpp"
+#include <cstdlib>
+#include <ctime>
+#include <iostream>
 
-World::World(sf::Vector2u l_windSize)
+World::World(std::shared_ptr<GameData> _data) : bird(_data->window.getSize()), windowSize(_data->window.getSize()), data(_data)
 {
-    m_blockSize = 16;
-    m_windowSize = l_windSize;
-    RespawnApple();
-    m_appleShape.setFillColor(sf::Color::Red);
-    m_appleShape.setRadius(m_blockSize / 2);
-    for (int i = 0; i < 4; ++i)
+    // bird = Bird(size);
+
+    spawnPipes();
+}
+
+void World::reset()
+{
+    spawnPipes();
+    bird.resetPosition(windowSize);
+}
+
+/// sf::Vector2i position(4, 2);
+/// sf::Vector2i size(18, 10);
+/// sf::IntRect r2(position, size);
+
+void World::spawnPipes()
+{
+    int startPos = 600;
+    int interLeave = 100;
+
+    std::srand(std::time(0));
+    for (int i = 0; i < 50; i += 2)
     {
-        m_bounds[i].setFillColor(sf::Color(150, 0, 0));
-        if (!((i + 1) % 2))
+        int randomNumber = 50 + std::rand() % 151;
+
+        int gap = 100 + std::rand() % 131;
+
+        sf::Vector2i positionD(0, 0);
+        sf::Vector2i sizeD(52, randomNumber);
+
+        sf::Vector2i positionU(0, 0);
+        sf::Vector2i sizeU(52, 512 - randomNumber - gap);
+
+        pipes[i] = sf::IntRect(positionD, sizeD);
+        posOfPipes[i] = sf::Vector2f(startPos + i * interLeave + 52, randomNumber);
+
+        pipes[i + 1] = sf::IntRect(positionU, sizeU);
+        posOfPipes[i + 1] = sf::Vector2f(startPos + i * interLeave, 512 - sizeU.y);
+    }
+}
+
+void World::movePipes(float dt)
+{
+    for (int i = 0; i < 50; i++)
+    {
+        posOfPipes[i].x -= 100 * dt;
+    }
+}
+void World::drawPipes(sf::RenderWindow &window)
+{
+    pipeDown.setScale({-1.0f, -1.0f});
+    for (int i = 0; i < 50; i += 2)
+    {
+        pipeDown.setTextureRect(pipes[i]);
+        pipeDown.setPosition(posOfPipes[i]);
+        pipeBound[i] = pipeDown.getGlobalBounds();
+
+        // pipeDown.setRotation(sf::Angle(3 / 2));
+
+        window.draw(pipeDown);
+
+        pipeUp.setTextureRect(pipes[i + 1]);
+        pipeUp.setPosition(posOfPipes[i + 1]);
+        pipeBound[i + 1] = pipeUp.getGlobalBounds();
+        window.draw(pipeUp);
+
+        // handle UpPipe
+    }
+    // pipeDown.setScale({1.0f, 1.0f});
+}
+void World::handleInput(sf::Event &event)
+{
+    if (event.is<sf::Event::KeyPressed>())
+    {
+        switch (event.getIf<sf::Event::KeyPressed>()->code)
         {
-            m_bounds[i].setSize(sf::Vector2f(m_windowSize.x,
-                                             m_blockSize));
-        }
-        else
-        {
-            m_bounds[i].setSize(sf::Vector2f(m_blockSize,
-                                             m_windowSize.y));
-        }
-        if (i < 2)
-        {
-            m_bounds[i].setPosition(sf::Vector2f(0, 0));
-        }
-        else
-        {
-            m_bounds[i].setOrigin(m_bounds[i].getSize());
-            m_bounds[i].setPosition(sf::Vector2f(m_windowSize));
+        case sf::Keyboard::Key::Space:
+            // std::cout << "pressedd space" << std::endl;
+            bird.handleInput(event);
+            break;
+        case sf::Keyboard::Key::Escape:
+            data->states.popState();
+            break;
+
+        default:
+            break;
         }
     }
 }
 
-World::~World() {}
-
-void World::RespawnApple()
+void World::update(float dt)
 {
-    int maxX = (m_windowSize.x / m_blockSize) - 2;
-    int maxY = (m_windowSize.y / m_blockSize) - 2;
-    m_item = sf::Vector2i(rand() % maxX + 1, rand() % maxY + 1); // (0 - maxX)
-    auto pos = m_appleShape.getPosition();
-    pos.x = m_item.x * m_blockSize;
-    pos.y = m_item.y * m_blockSize;
-    m_appleShape.setPosition(pos);
+    // std::cout << "world update" << std::endl;
+    movePipes(dt);
+    bird.moveUp(dt);
 }
 
-void World::Update(Snake &l_player)
+void World::draw()
 {
-    if (l_player.GetPosition() == m_item)
-    {
-        l_player.Extend();
-        l_player.IncreaseScore();
-        RespawnApple();
-    }
-    int gridSize_x = m_windowSize.x / m_blockSize;
-    int gridSize_y = m_windowSize.y / m_blockSize;
+    // std::cout << "world drwa" << std::endl;
+    data->window.clear();
+    data->window.draw(background);
+    drawPipes(data->window);
 
-    //out of bounds
-    if (l_player.GetPosition().x <= 0 ||
-        l_player.GetPosition().y <= 0 ||
-        l_player.GetPosition().x >= gridSize_x - 1 || l_player.GetPosition().y >= gridSize_y - 1)
+    bird.draw(data->window);
+
+    if (checkCollisons())
     {
-        l_player.Lose();
+        data->states.pushState(state(new GameOver(data)));
     }
+    data->window.display();
 }
 
-void World::Render(sf::RenderWindow &l_window)
+void World::pause()
 {
-    //std::cout<<"world render";
-    for (int i = 0; i < 4; ++i)
-    {
-        l_window.draw(m_bounds[i]);
-    }
-    l_window.draw(m_appleShape);
 }
 
-int World::GetBlockSize() { return m_blockSize; }
+void World::resume()
+{
+}
+
+bool World::checkCollisons()
+{
+    sf::Rect<float> bird_bound = bird.getBounds();
+
+    if (bird.getPosition().y <= 0 || bird.getPosition().y > windowSize.y)
+        return true;
+
+    bool collison = false;
+    for (int i = 0; i < 50; i++)
+    {
+        if (bird_bound.findIntersection(pipeBound[i]))
+        {
+            collison = true;
+            break;
+        }
+    }
+
+    return collison;
+}
